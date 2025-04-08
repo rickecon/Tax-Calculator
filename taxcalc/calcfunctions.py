@@ -790,6 +790,102 @@ def AGI(ymod1, c02500, c02900, XTOT, MARS, sep, DSI, exact, nu18, taxable_ubi,
     return (c00100, pre_c04600, c04600)
 
 
+II_em_Ingram = {"2025": 20000}
+
+
+@iterate_jit(nopython=True)
+def AGI_Ingram(
+    ymod1, c02500, c02900, XTOT, MARS, sep, DSI, exact, nu18, taxable_ubi,
+    II_em_Ingram, II_em_ps, II_prt, II_no_em_nu18, e02300, UI_thd, UI_em,
+    c00100, pre_c04600, c04600
+):
+    """
+    Computes Adjusted Gross Income (AGI), c00100, and
+    compute personal exemption amount, c04600.
+
+    Parameters
+    ----------
+    ymod1: float
+        Variable that is included in AGI
+    c02500: float
+        Social security (OASDI) benefits included in AGI
+    c02900: float
+        Total of all "above the line" income adjustments to get AGI
+    XTOT: int
+        Total number of exemptions for filing unit
+    MARS: int
+        Filing marital status (1=single, 2=joint, 3=separate,
+                               4=household-head, 5=widow(er))
+    sep: int
+        2 when MARS is 3 (married filing separately); otherwise 1
+    DSI: int
+        1 if claimed as dependent on another return; otherwise 0
+    exact: int
+        Whether or not to do rounding of phaseout fraction
+    nu18: int
+        Number of people in the tax unit under 18
+    taxable_ubi: float
+        Amount of UBI that is taxable (is added to AGI)
+    II_em: float
+        Personal and dependent exemption amount
+    II_em_ps: list
+        Personal exemption phaseout starting income
+    II_prt: float
+        Personal exemption phaseout rate
+    II_no_em_nu18: float
+        Repeal personal exemptions for dependents under age 18
+    e02300: float
+        Unemployment compensation
+    UI_thd: list
+        AGI threshold for unemployment compensation exclusion
+    UI_em: float
+        Amount of unemployment compensation excluded from AGI
+    c00100: float
+        Adjusted Gross Income (AGI)
+    pre_c04600: float
+        Personal exemption before phase-out
+    c04600: float
+        Personal exemptions after phase-out
+
+    Returns
+    -------
+    c00100: float
+        Adjusted Gross Income (AGI)
+    pre_c04600: float
+        Personal exemption before phase-out
+    c04600: float
+        Personal exemptions after phase-out
+    """
+    # calculate AGI assuming no foreign earned income exclusion
+    c00100 = ymod1 + c02500 - c02900 + taxable_ubi
+    # calculate UI exclusion (e.g., from 2020 AGI due to ARPA)
+    if (c00100 - e02300) <= UI_thd[MARS - 1]:
+        ui_excluded = min(e02300, UI_em)
+    else:
+        ui_excluded = 0.
+    c00100 -= ui_excluded
+    # calculate personal exemption amount
+    pre_c04600 = nu18 * II_em_Ingram
+    # if II_no_em_nu18:  # repeal of personal exemptions for deps. under 18
+    #     pre_c04600 = max(0, XTOT - nu18) * II_em
+    # else:
+    #     pre_c04600 = XTOT * II_em
+    if DSI:
+        pre_c04600 = 0.
+    # phase-out personal exemption amount
+    if exact == 1:  # exact calculation as on tax forms
+        line5 = max(0., c00100 - II_em_ps[MARS - 1])
+        line6 = math.ceil(line5 / (2500. / sep))
+        line7 = II_prt * line6
+        c04600 = max(0., pre_c04600 * (1. - line7))
+    else:  # smoothed calculation needed for sensible mtr calculation
+        dispc_numer = II_prt * (c00100 - II_em_ps[MARS - 1])
+        dispc_denom = 2500. / sep
+        dispc = min(1., max(0., dispc_numer / dispc_denom))
+        c04600 = pre_c04600 * (1. - dispc)
+    return (c00100, pre_c04600, c04600)
+
+
 @iterate_jit(nopython=True)
 def ItemDedCap(e17500, e18400, e18500, e19200, e19800, e20100, e20400, g20500,
                c00100, ID_AmountCap_rt, ID_AmountCap_Switch, e17500_capped,
@@ -1269,6 +1365,92 @@ def StdDed(DSI, earned, STD, age_head, age_spouse, STD_Aged, STD_Dep,
     if MARS == 2 and age_spouse >= 65:
         num_extra_stded += 1
     extra_stded = num_extra_stded * STD_Aged[MARS - 1]
+    # calculate the total standard deduction
+    standard = basic_stded + extra_stded
+    if MARS == 3 and MIDR == 1:
+        standard = 0.
+    # calculate CARES cash charity deduction for nonitemizers
+    if STD_allow_charity_ded_nonitemizers:
+        capped_ded = min(e19800, ID_Charity_crt_cash * c00100)
+        standard += min(capped_ded, STD_charity_ded_nonitemizers_max[MARS - 1])
+    return standard
+
+
+STD_Ingram = {"2025": [25000,50000,50000,25000,25000]}
+STD_Aged_Ingram = {"2025": [0,0,0,0,0]}
+
+
+@iterate_jit(nopython=True)
+def StdDed_Ingram(
+    DSI, earned, STD_Ingram, age_head, age_spouse, STD_Aged_ingram, STD_Dep,
+    MARS, MIDR, blind_head, blind_spouse, standard,
+    STD_allow_charity_ded_nonitemizers, e19800, ID_Charity_crt_cash, c00100, STD_charity_ded_nonitemizers_max
+):
+    """
+    Calculates standard deduction, including standard deduction for
+    dependents, aged and bind.
+
+    Parameters
+    -----
+    DSI: int
+        1 if claimed as dependent on another return; otherwise 0
+    earned: float
+        Earned income for filing unit
+    STD: list
+        Standard deduction amount
+    age_head: int
+        Age in years of taxpayer
+    age_spouse: int
+        Age in years of spouse
+    STD_Aged: list
+        Additional standard deduction for blind and aged
+    STD_Dep: float
+        Standard deduction for dependents
+    MARS: int
+        Filing (marital) status. (1=single, 2=joint, 3=separate,
+                                  4=household-head, 5=widow(er))
+    MIDR: int
+        1 if separately filing spouse itemizes, 0 otherwise
+    blind_head: int
+        1 if taxpayer is blind, 0 otherwise
+    blind_spouse: int
+        1 if spouse is blind, 0 otherwise
+    standard: float
+        Standard deduction (zero for itemizers)
+    STD_allow_charity_ded_nonitemizers: bool
+        Allow standard deduction filers to take the charitable contributions
+        deduction
+    e19800: float
+        Schedule A: cash charitable contributions
+    ID_Charity_crt_cash: float
+        Fraction of AGI cap on cash charitable deductions
+    c00100: float
+        Federal AGI
+    STD_charity_ded_nonitemizers_max: float
+        Ceiling amount (in dollars) for charitable deductions for nonitemizers
+
+    Returns
+    -------
+    standard: float
+        Standard deduction (zero for itemizers)
+    """
+    # calculate deduction for dependents
+    if DSI == 1:
+        c15100 = max(350. + earned, STD_Dep)
+        basic_stded = min(STD_Ingram[MARS - 1], c15100)
+    else:
+        c15100 = 0.
+        if MIDR == 1:
+            basic_stded = 0.
+        else:
+            basic_stded = STD_Ingram[MARS - 1]
+    # calculate extra standard deduction for aged and blind
+    num_extra_stded = blind_head + blind_spouse
+    if age_head >= 65:
+        num_extra_stded += 1
+    if MARS == 2 and age_spouse >= 65:
+        num_extra_stded += 1
+    extra_stded = num_extra_stded * STD_Aged_Ingram[MARS - 1]
     # calculate the total standard deduction
     standard = basic_stded + extra_stded
     if MARS == 3 and MIDR == 1:
@@ -3460,6 +3642,86 @@ def CTC_new(CTC_new_c, CTC_new_rt, CTC_new_c_under6_bonus,
     else:
         ctc_new = 0.
     return ctc_new
+
+
+@iterate_jit(nopython=True)
+def IITAX_orig(
+    c59660, c11070, c10960, personal_refundable_credit, ctc_new, rptc, c09200,
+    payrolltax, CDCC_refund, recovery_rebate_credit, eitc, c07220, odc,
+    CTC_is_refundable, ODC_is_refundable, refund, ctc_total, ctc_refundable,
+    ctc_nonrefundable, iitax, combined
+):
+    """
+    Computes final taxes.
+
+    Parameters
+    ----------
+    c59660: float
+        EITC amount
+    c11070: float
+        Child tax credit (refunded) from Form 8812
+    c10960: float
+        American Opportunity Credit refundable amount from Form 8863
+    personal_refundable_credit: float
+        Personal refundable credit
+    ctc_new: float
+        New refundable child tax credit
+    rptc: float
+        Refundable Payroll Tax Credit for filing unit
+    c09200: float
+        Income tax liabilities (including othertaxes) after non-refundable
+        credits are used, but before refundable credits are applied
+    payrolltax: float
+        Total (employee + employer) payroll tax liability
+    eitc: float
+        Earned Income Credit
+    refund: float
+        Total refundable income tax credits
+    ctc_total: float
+        Total CTC amount (c07220 + c11070 + odc + ctc_new)
+    ctc_refundable: float
+        Portion of total CTC amount that is refundable
+    iitax: float
+        Total federal individual income tax liability
+    combined: float
+        Sum of iitax and payrolltax and lumpsum_tax
+
+    Returns
+    -------
+    eitc: float
+        Earned Income Credit
+    refund: float
+        Total refundable income tax credits
+    ctc_total: float
+        Total CTC amount (c07220 + c11070 + odc + ctc_new)
+    ctc_refundable: float
+        Portion of total CTC amount that is refundable
+    ctc_nonrefundable: float
+        Portion of total CTC amount that is nonrefundable
+    iitax: float
+        Total federal individual income tax liability
+    combined: float
+        Sum of iitax and payrolltax and lumpsum_tax
+    """
+    eitc = c59660
+    if CTC_is_refundable:
+        ctc_refund = c07220
+    else:
+        ctc_refund = 0.
+    if ODC_is_refundable:
+        odc_refund = odc
+    else:
+        odc_refund = 0.
+    refund = (eitc + c11070 + c10960 + CDCC_refund + recovery_rebate_credit +
+              personal_refundable_credit + ctc_new + rptc + ctc_refund +
+              odc_refund)
+    ctc_total = c07220 + c11070 + odc + ctc_new
+    ctc_refundable = ctc_refund + c11070 + odc_refund + ctc_new
+    ctc_nonrefundable = max(0., ctc_total - ctc_refundable)
+    iitax = c09200 - refund
+    combined = iitax + payrolltax
+    return (eitc, refund, ctc_total, ctc_refundable, ctc_nonrefundable,
+            iitax, combined)
 
 
 @iterate_jit(nopython=True)
