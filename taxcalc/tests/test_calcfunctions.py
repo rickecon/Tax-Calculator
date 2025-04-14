@@ -861,6 +861,7 @@ II_em = 0.0
 II_em_ps = [9e+99, 9e+99, 9e+99, 9e+99, 9e+99]
 II_prt = 0.02
 II_no_em_nu18 = False
+II_em_Ingram = False
 e02300 = 10200
 UI_thd = [150000, 150000, 150000, 150000, 150000]
 UI_em = 10200
@@ -870,7 +871,7 @@ c04600 = 0  # calculated in functio
 
 tuple0 = (
     ymod1, c02500, c02900, XTOT, MARS, sep, DSI, exact, nu18, taxable_ubi,
-    II_em, II_em_ps, II_prt, II_no_em_nu18,
+    II_em, II_em_ps, II_prt, II_no_em_nu18, II_em_Ingram,
     e02300, UI_thd, UI_em, c00100, pre_c04600, c04600)
 # returned tuple is (c00100, pre_c04600, c04600)
 expected0 = (19330, 0, 0)
