@@ -1,4 +1,4 @@
-Metadata-Version: 2.2
+Metadata-Version: 2.4
 Name: taxcalc
 Version: 4.5.0
 Summary: Tax-Calculator
@@ -29,6 +29,7 @@ Dynamic: description-content-type
 Dynamic: download-url
 Dynamic: home-page
 Dynamic: license
+Dynamic: license-file
 Dynamic: requires-dist
 Dynamic: summary
 

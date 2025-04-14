@@ -2161,6 +2161,32 @@
             "cps": true
         }
     },
+    "II_em_Ingram": {
+        "title": "Ingram flat tax with personal exemption amount for each dependent under ag 18",
+        "description": "Ingram flat tax with personal exemption amount for each dependent under ag 18.",
+        "notes": "",
+        "section_1": "Personal Exemptions",
+        "section_2": "Ingram flat tax personal exemption for dependents Under Age 18",
+        "indexable": false,
+        "indexed": false,
+        "type": "bool",
+        "value": [
+            {
+                "year": 2013,
+                "value": false
+            }
+        ],
+        "validators": {
+            "range": {
+                "min": false,
+                "max": true
+            }
+        },
+        "compatible_data": {
+            "puf": true,
+            "cps": true
+        }
+    },
     "STD": {
         "title": "Standard deduction amount",
         "description": "Amount filing unit can use as a standard deduction.",
