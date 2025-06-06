@@ -5,7 +5,7 @@
 | Testing | ![example event parameter](https://github.com/PSLmodels/Tax-Calculator/actions/workflows/build_and_test.yml/badge.svg?branch=master) ![example event parameter](https://github.com/PSLmodels/Tax-Calculator/actions/workflows/deploy_jupyterbook.yml/badge.svg?branch=master)  [![Codecov](https://codecov.io/gh/PSLmodels/Tax-Calculator/branch/master/graph/badge.svg)](https://codecov.io/gh/PSLmodels/Tax-Calculator) |
 
 
-Tax-Calculator
+Tax-Calculator (is cool)
 ==============
 
 Tax-Calculator is an open-source microsimulation model for static
