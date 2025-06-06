@@ -69,7 +69,7 @@ def test_make_calculator_with_policy_reform(cps_subsample):
     pol.implement_reform(reform)
     # create a Calculator object using this policy reform
     calc = Calculator(policy=pol, records=rec)
-    assert calc.reform_warnings == {}
+    assert calc.reform_errors == {}
     # check that Policy object embedded in Calculator object is correct
     assert calc.current_year == year
     assert calc.policy_param('II_em') == 4000
@@ -808,10 +808,10 @@ def test_itemded_component_amounts(year, cvname, hcname, puf_fullsample):
     policy2.implement_reform(reform2)
     assert not policy2.parameter_errors
     # compute tax liability in specified year
-    calc1 = Calculator(policy=policy1, records=recs, verbose=False)
+    calc1 = Calculator(policy=policy1, records=recs, verbose=True)
     calc1.advance_to_year(year)
     calc1.calc_all()
-    calc2 = Calculator(policy=policy2, records=recs, verbose=False)
+    calc2 = Calculator(policy=policy2, records=recs, verbose=True)
     calc2.advance_to_year(year)
     calc2.calc_all()
     # confirm that nobody is taking the standard deduction

@@ -3,11 +3,7 @@ Tax-Calculator functions that calculate payroll and individual income taxes.
 
 These functions are imported into the Calculator class.
 
-Note: the parameter_indexing_CPI_offset policy parameter is the only
-policy parameter that does not appear here; it is used in the policy.py
-file to possibly adjust the price inflation rate used to index policy
-parameters (as would be done in a reform that introduces chained-CPI
-indexing).
+Note: the parameter_indexing_CPI_offset parameter is no longer used.
 """
 # CODING-STYLE CHECKS:
 # pycodestyle calcfunctions.py
@@ -2066,7 +2062,7 @@ def AMT(e07300, dwks13, standard, f6251, c00100, c18300, taxbc,
     e62900: float
         Alternative Minimum Tax foreign tax credit from Form 6251
     e00700: float
-        Schedule C business net profit/loss for filing unit
+        Taxable refunds of state and local income taxes
     dwks10: float
         Sum of dwks6 + dwks9
     age_head: int
@@ -3201,7 +3197,7 @@ def NonrefundableCredits(c05800, e07240, e07260, e07300, e07400,
 @iterate_jit(nopython=True)
 def AdditionalCTC(codtc_limited, ACTC_c, n24, earned, ACTC_Income_thd,
                   ACTC_rt, nu06, ACTC_rt_bonus_under6family, ACTC_ChildNum,
-                  CTC_is_refundable, CTC_include17,
+                  CTC_is_refundable, CTC_include17, CTC_c,
                   age_head, age_spouse, MARS, nu18,
                   ptax_was, c03260, e09800, c59660, e11200,
                   c11070):
@@ -3262,7 +3258,7 @@ def AdditionalCTC(codtc_limited, ACTC_c, n24, earned, ACTC_Income_thd,
             childnum = n24 + max(0, nu18 - tu18 - su18 - n24)
         else:
             childnum = n24
-        line4 = ACTC_c * childnum
+        line4 = min(ACTC_c, CTC_c) * childnum
     c11070 = 0.  # line15
     if line3 > 0. and line4 > 0.:
         line5 = min(line3, line4)
